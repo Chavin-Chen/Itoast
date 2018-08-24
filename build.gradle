@@ -29,7 +29,7 @@ publish {
     // project name
     artifactId = 'itoast'
     // version
-    publishVersion = '1.0.0'
+    publishVersion = '1.0.1'
     // description
     desc = 'this is a tool for android toast'
     // can use github

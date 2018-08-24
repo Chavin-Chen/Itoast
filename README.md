@@ -19,7 +19,7 @@ How to Use It?
     }
 
     dependencies {
-      implementation 'com.chavinchen:itoast:1.0.0'
+      implementation 'com.chavinchen:itoast:1.0.1'
     }
 ```
 

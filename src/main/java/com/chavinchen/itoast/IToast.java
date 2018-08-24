@@ -31,7 +31,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 public class IToast {
 
     private Request mRequest;
-    private IToastView mIToastView;
 
     private IToast() {
     }
@@ -152,13 +151,17 @@ public class IToast {
     }
 
     public void cancel() {
-        if (null != mRequest && null != mIToastView) {
-            if (mRequest.equals(ConfigHolder.mRequests.peek())) {
-                mIToastView.cancel();
-                mRequest = null;
-            } else {
-                mRequest.active = false;
-                mRequest = null;
+        if (null != mRequest) {
+            mRequest.active = false;
+            if (null != mRequest.iToastView) {
+                mRequest.iToastView.cancel();
+            }
+            if(null != mRequest.aToastView){
+                mRequest.aToastView.cancel();
+                if(null != mRequest.aHandler){
+                    mRequest.aHandler.removeCallbacksAndMessages(null);
+                    response();
+                }
             }
         }
     }
@@ -168,7 +171,7 @@ public class IToast {
 
     private void request(Request request) {
         ConfigHolder.mRequests.offer(request);
-        if (!ConfigHolder.mRequests.isEmpty() && !ConfigHolder.mIsApplying) {
+        if (ConfigHolder.mRequests.size() > 0 && !ConfigHolder.mIsApplying) {
             apply();
         }
     }
@@ -179,8 +182,7 @@ public class IToast {
         final Context context;
         if (null == request
                 || null == request.context
-                || null == (context = request.context.get())
-                || !request.active) {
+                || null == (context = request.context.get())) {
             response();
             return;
         }
@@ -210,9 +212,11 @@ public class IToast {
 
     private void response() {
         ConfigHolder.mIsApplying = false;
-        ConfigHolder.mRequests.poll();
+        if(null == mRequest || !mRequest.active || mRequest.equals(ConfigHolder.mRequests.peek())){
+            ConfigHolder.mRequests.poll();
+        }
         destroy();
-        if (ConfigHolder.mRequests.isEmpty()) {
+        if (ConfigHolder.mRequests.size() <= 0) {
             return;
         }
         apply();
@@ -222,7 +226,7 @@ public class IToast {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                showAToast(context.getApplicationContext(), request.argument);
+                showAToast(context.getApplicationContext(), request);
             }
         };
         if (isMainThread()) {
@@ -242,7 +246,7 @@ public class IToast {
         Runnable r = new Runnable() {
             @Override
             public void run() {
-                mIToastView = IToastView.newInstance(request.argument).show(activity.getSupportFragmentManager());
+                request.iToastView = IToastView.newInstance(request.argument).show(activity.getSupportFragmentManager(),request.active);
             }
         };
         if (isMainThread()) {
@@ -253,16 +257,16 @@ public class IToast {
     }
 
     @SuppressLint("ShowToast")
-    private void showAToast(Context context, RequestArgument argument) {
-        Toast toast;
+    private void showAToast(Context context, Request request) {
+        RequestArgument argument = request.argument;
         if (null != argument.view) {
-            toast = new Toast(context.getApplicationContext());
-            toast.setView(argument.view);
+            request.aToastView = new Toast(context.getApplicationContext());
+            request.aToastView.setView(argument.view);
         } else {
-            toast = Toast.makeText(context.getApplicationContext(),
+            request.aToastView = Toast.makeText(context.getApplicationContext(),
                     argument.message, Toast.LENGTH_SHORT);
             if (0 != argument.icon) {
-                View view = toast.getView();
+                View view = request.aToastView.getView();
                 TextView textView = (TextView) view.findViewById(android.R.id.message);
                 Drawable dwLeft = ContextCompat.getDrawable(view.getContext(), argument.icon);
                 if (null != dwLeft) {
@@ -275,47 +279,61 @@ public class IToast {
         long delay;
         switch (argument.duration) {
             case DURATION.SHORT:
-                toast.setDuration(Toast.LENGTH_SHORT);
+                request.aToastView.setDuration(Toast.LENGTH_SHORT);
                 delay = IToastView.LENGTH_SHORT;
                 break;
             case DURATION.LONG:
-                toast.setDuration(Toast.LENGTH_LONG);
+                request.aToastView.setDuration(Toast.LENGTH_LONG);
                 delay = IToastView.LENGTH_LONG;
                 break;
             default:
-                toast.setDuration(Toast.LENGTH_SHORT);
+                request.aToastView.setDuration(Toast.LENGTH_SHORT);
                 delay = IToastView.LENGTH_SHORT;
         }
         switch (argument.gravity) {
             case GRAVITY.TOP:
-                toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL,
-                        toast.getXOffset(), toast.getYOffset());
+                request.aToastView.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL,
+                        request.aToastView.getXOffset(), request.aToastView.getYOffset());
                 break;
             case GRAVITY.CENTER:
-                toast.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL,
-                        toast.getXOffset(), toast.getYOffset());
+                request.aToastView.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL,
+                        request.aToastView.getXOffset(), request.aToastView.getYOffset());
                 break;
             case GRAVITY.BOTTOM:
-                toast.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
-                        toast.getXOffset(), toast.getYOffset());
+                request.aToastView.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
+                        request.aToastView.getXOffset(), request.aToastView.getYOffset());
                 break;
             default:
-                toast.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
-                        toast.getXOffset(), toast.getYOffset());
+                request.aToastView.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL,
+                        request.aToastView.getXOffset(), request.aToastView.getYOffset());
 
         }
-        toast.show();
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+        request.aToastView.show();
+        if(!request.active){
+            request.aToastView.cancel();
+            response();
+            return ;
+        }
+        request.aHandler = new Handler(Looper.getMainLooper());
+        request.aHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 response();
             }
         }, delay);
+
     }
 
     private void destroy() {
+        if(null == mRequest){
+            return;
+        }
+        mRequest.iToastView = null;
+
+        mRequest.aToastView = null;
+        mRequest.aHandler = null;
+
         mRequest = null;
-        mIToastView = null;
     }
 
     private boolean isMainThread() {
@@ -403,7 +421,11 @@ public class IToast {
     static class Request {
 
         SoftReference<Context> context;
-        boolean active = true;
+        volatile boolean active = true;
+        volatile IToastView iToastView;
+
+        volatile Handler aHandler;
+        volatile Toast aToastView;
 
         RequestArgument argument;
 

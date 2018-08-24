@@ -30,7 +30,7 @@ import android.widget.Toast;
  * Created by ChavinChen on 2018/08/25 0:31
  * EMAIL: <a href="mailto:chavinchen@hotmail.com">chavinchen@hotmail.com</a>
  */
-public class IToastView extends DialogFragment {
+public class IToastView extends DialogFragment implements DialogInterface.OnShowListener{
 
     private static final String KEY_MESSAGE = "KEY_MESSAGE";
     private static final String KEY_DURATION = "KEY_DURATION";
@@ -39,7 +39,7 @@ public class IToastView extends DialogFragment {
 
     private static final CharSequence DEFAULT_MESSAGE = "Empty Message! {.Chavin}";
 
-    public static final String TAG = "A_TOAST";
+    public static final String TAG = "I_TOAST";
 
 
     public static IToastView newInstance(@NonNull IToast.RequestArgument argument) {
@@ -75,6 +75,9 @@ public class IToastView extends DialogFragment {
     private View mCustomView;
 
     private ToastDisappearListener mListener;
+
+    private boolean mActive = true;
+    private boolean mIsShow = false;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -162,6 +165,7 @@ public class IToastView extends DialogFragment {
             params.windowAnimations = android.R.style.Animation_Toast;
             params.type = WindowManager.LayoutParams.LAST_APPLICATION_WINDOW;// 1000
         }
+        dialog.setOnShowListener(this);
         return dialog;
     }
 
@@ -178,6 +182,13 @@ public class IToastView extends DialogFragment {
         clearDuration();
     }
 
+    @Override
+    public void onShow(DialogInterface dialog) {
+        mIsShow = true;
+        if(!mActive){
+            dismissAllowingStateLoss();
+        }
+    }
 
     @Override
     public void onDismiss(DialogInterface dialog) {
@@ -200,13 +211,15 @@ public class IToastView extends DialogFragment {
         return res;
     }
 
-    public IToastView show(FragmentManager manager) {
+    public IToastView show(FragmentManager manager, boolean active) {
+        mActive = active;
         show(manager, TAG);
         return this;
     }
 
     public void cancel() {
-        clearDuration();
+        mActive = false;
+        dismissAllowingStateLoss();
     }
 
     private void applyDuration() {

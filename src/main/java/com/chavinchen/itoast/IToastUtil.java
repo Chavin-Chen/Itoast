@@ -15,7 +15,7 @@ public class IToastUtil {
 
     private static Context mApplicationContext;
 
-    private static IToast sItoast;
+    private static volatile IToast sItoast;
 
     public static void init(Context context, @IToast.STRATEGY int strategy, @NonNull IToast.AppController controller) {
         mApplicationContext = context.getApplicationContext();
